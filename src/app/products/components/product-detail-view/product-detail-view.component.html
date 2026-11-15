@@ -1,0 +1,120 @@
+@if (product) {
+  <div class="product-detail-card">
+    <ion-card class="main-card">
+      <ion-card-header>
+        <div class="header-badges">
+          <ion-chip [color]="product.isOpened ? 'warning' : 'medium'" class="opened-chip">
+            <ion-icon [name]="product.isOpened ? 'lock-open-outline' : 'shield-checkmark-outline'"></ion-icon>
+            <ion-label>{{ product.isOpened ? 'Opened' : 'Sealed / Unopened' }}</ion-label>
+          </ion-chip>
+
+          <ion-chip [color]="expirationInfo.color" class="expiration-chip">
+            <ion-icon
+              [name]="
+                expirationInfo.state === 'expired'
+                  ? 'alert-circle-outline'
+                  : expirationInfo.state === 'warning'
+                    ? 'warning-outline'
+                    : 'checkmark-circle-outline'
+              "
+            ></ion-icon>
+            <ion-label>{{ expirationInfo.label }}</ion-label>
+          </ion-chip>
+        </div>
+
+        <ion-card-title class="product-title">{{ product.name }}</ion-card-title>
+        <ion-card-subtitle class="product-category">
+          <ion-icon [name]="categoryIcon"></ion-icon>
+          <span>{{ product.category }}</span>
+        </ion-card-subtitle>
+      </ion-card-header>
+
+      <ion-card-content>
+        @if (photoUrl) {
+          <img class="product-detail-photo" [src]="photoUrl" [alt]="product.name" (error)="handlePhotoLoadError()" />
+        } @else if (photoError) {
+          <p class="product-photo-error" role="status">{{ photoError }}</p>
+        }
+
+        <!-- Key Metric Highlights -->
+        <div class="metrics-grid">
+          <div class="metric-item">
+            <div class="metric-label">Quantity</div>
+            <div class="metric-value">{{ product.quantity }}</div>
+            @if (product.unit) {
+              <div class="metric-unit">{{ product.unit }}</div>
+            }
+          </div>
+          <div class="metric-item">
+            <div class="metric-label">Status</div>
+            <div class="metric-value status-text" [class.opened]="product.isOpened">
+              {{ product.isOpened ? 'In Use' : 'Stored' }}
+            </div>
+            <div class="metric-unit">{{ product.isOpened ? 'Opened container' : 'Intact packaging' }}</div>
+          </div>
+        </div>
+
+        <!-- Detailed Attributes List -->
+        <ion-list lines="inset" class="attributes-list">
+          <ion-item>
+            <ion-icon name="calendar-outline" slot="start" color="primary"></ion-icon>
+            <ion-label>
+              <h3>Expiration Date</h3>
+              <p>{{ formattedExpirationDate }}</p>
+            </ion-label>
+            <ion-badge slot="end" [color]="expirationInfo.color">
+              {{ expirationInfo.state.toUpperCase() }}
+            </ion-badge>
+          </ion-item>
+
+          <ion-item>
+            <ion-icon name="cube-outline" slot="start" color="primary"></ion-icon>
+            <ion-label>
+              <h3>Quantity In Stock</h3>
+              <p>{{ product.quantity }} {{ product.unit || 'units' }}</p>
+            </ion-label>
+          </ion-item>
+
+          <ion-item>
+            <ion-icon name="pricetag-outline" slot="start" color="primary"></ion-icon>
+            <ion-label>
+              <h3>Category</h3>
+              <p>{{ product.category }}</p>
+            </ion-label>
+          </ion-item>
+
+          <ion-item>
+            <ion-icon
+              [name]="product.isOpened ? 'lock-open-outline' : 'shield-checkmark-outline'"
+              slot="start"
+              color="primary"
+            ></ion-icon>
+            <ion-label>
+              <h3>Packaging Condition</h3>
+              <p>{{ product.isOpened ? 'Opened item — consume promptly' : 'Factory sealed — optimal preservation' }}</p>
+            </ion-label>
+          </ion-item>
+
+          @if (product.notes) {
+            <ion-item>
+              <ion-icon name="document-text-outline" slot="start" color="medium"></ion-icon>
+              <ion-label class="ion-text-wrap">
+                <h3>Notes & Storage Advice</h3>
+                <p>{{ product.notes }}</p>
+              </ion-label>
+            </ion-item>
+          }
+        </ion-list>
+      </ion-card-content>
+    </ion-card>
+  </div>
+} @else {
+  <!-- Placeholder when no product is selected (Desktop side pane) -->
+  <div class="no-selection-placeholder">
+    <div class="placeholder-icon">
+      <ion-icon name="basket-outline"></ion-icon>
+    </div>
+    <h3>Select an Item</h3>
+    <p>Choose a food product from the inventory list to view its complete details and expiration status.</p>
+  </div>
+}

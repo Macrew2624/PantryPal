@@ -1,0 +1,38 @@
+.state-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  min-height: 50vh;
+  padding: 24px;
+
+  p {
+    color: var(--ion-color-medium, #666);
+    margin-top: 12px;
+    max-width: 320px;
+  }
+}
+
+.network-status-badge {
+  margin-inline-end: 12px;
+  font-size: 0.65rem;
+  font-weight: 700;
+}
+
+.error-container {
+  .state-icon {
+    font-size: 3.8rem;
+    margin-bottom: 8px;
+  }
+
+  h2 {
+    font-weight: 700;
+    color: var(--ion-color-dark, #222);
+    margin-bottom: 4px;
+  }
+
+  ion-button {
+    margin-top: 16px;
+  }
+}

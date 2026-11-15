@@ -1,0 +1,60 @@
+<ion-header>
+  <ion-toolbar color="primary">
+    <ion-title>
+      PantryPal @if (networkStatus$ | async; as networkStatus) {
+      <ion-badge [color]="networkStatus.connected ? 'success' : 'danger'">
+        {{ networkStatus.connected ? 'ONLINE' : 'OFFLINE' }}
+      </ion-badge>
+      }
+    </ion-title>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content class="ion-padding auth-content">
+  <ion-card class="auth-card">
+    <ion-card-header>
+      <ion-card-title>{{ isRegistering ? 'Create your account' : 'Sign in to your pantry' }}</ion-card-title>
+    </ion-card-header>
+    <ion-card-content>
+      <form (ngSubmit)="submit()">
+        <ion-input
+          label="Email"
+          labelPlacement="stacked"
+          type="email"
+          name="email"
+          autocomplete="username"
+          [(ngModel)]="email"
+          required
+        ></ion-input>
+        <ion-input
+          label="Password"
+          labelPlacement="stacked"
+          type="password"
+          name="password"
+          [autocomplete]="isRegistering ? 'new-password' : 'current-password'"
+          [(ngModel)]="password"
+          [minlength]="isRegistering ? 8 : 1"
+          required
+        ></ion-input>
+
+        @if (isRegistering) {
+        <p class="password-help">Use at least 8 characters.</p>
+        } @if (errorMessage) {
+        <p class="auth-error" role="alert">{{ errorMessage }}</p>
+        } @if (successMessage) {
+        <p class="auth-success" role="status">{{ successMessage }}</p>
+        }
+
+        <ion-button expand="block" type="submit" [disabled]="isSubmitting || !email || !password">
+          @if (isSubmitting) {
+          <ion-spinner name="crescent"></ion-spinner>
+          } @else { {{ isRegistering ? 'Create account' : 'Sign in' }} }
+        </ion-button>
+      </form>
+
+      <ion-button expand="block" fill="clear" type="button" (click)="toggleMode()">
+        {{ isRegistering ? 'Already have an account? Sign in' : 'New to PantryPal? Create an account' }}
+      </ion-button>
+    </ion-card-content>
+  </ion-card>
+</ion-content>

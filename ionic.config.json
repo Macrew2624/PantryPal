@@ -1,0 +1,7 @@
+{
+  "name": "PantryPal",
+  "integrations": {
+    "capacitor": {}
+  },
+  "type": "angular-standalone"
+}

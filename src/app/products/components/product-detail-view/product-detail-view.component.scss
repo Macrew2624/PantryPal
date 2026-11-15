@@ -1,0 +1,138 @@
+.product-detail-card {
+  max-width: 680px;
+  margin: 0 auto;
+}
+
+.main-card {
+  border-radius: 16px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
+  margin: 16px;
+}
+
+.header-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 8px;
+
+  ion-chip {
+    margin: 0;
+    font-size: 0.8rem;
+    font-weight: 600;
+  }
+}
+
+.product-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin-top: 4px;
+}
+
+.product-category {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.9rem;
+  color: var(--ion-color-medium);
+}
+
+.product-detail-photo {
+  display: block;
+  width: min(100%, 520px);
+  max-height: 360px;
+  margin: 0 auto 18px;
+  border-radius: 12px;
+  object-fit: contain;
+}
+
+.product-photo-error {
+  color: var(--ion-color-medium);
+  text-align: center;
+}
+
+.metrics-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.metric-item {
+  background: var(--ion-color-light, #f4f5f8);
+  padding: 12px;
+  border-radius: 12px;
+  text-align: center;
+
+  .metric-label {
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    font-weight: 600;
+    color: var(--ion-color-medium);
+  }
+
+  .metric-value {
+    font-size: 1.4rem;
+    font-weight: 700;
+    color: var(--ion-color-primary);
+    margin: 2px 0;
+
+    &.status-text {
+      color: var(--ion-color-success);
+      font-size: 1.2rem;
+
+      &.opened {
+        color: var(--ion-color-warning);
+      }
+    }
+  }
+
+  .metric-unit {
+    font-size: 0.75rem;
+    color: var(--ion-color-medium);
+  }
+}
+
+.attributes-list {
+  background: transparent;
+
+  ion-item {
+    h3 {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      color: var(--ion-color-medium);
+    }
+    p {
+      font-size: 0.95rem;
+      font-weight: 500;
+    }
+  }
+}
+
+.no-selection-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  min-height: 360px;
+  padding: 24px;
+  color: var(--ion-color-medium);
+
+  .placeholder-icon {
+    font-size: 3.5rem;
+    margin-bottom: 8px;
+  }
+
+  h3 {
+    font-size: 1.2rem;
+    font-weight: 600;
+    color: var(--ion-color-dark);
+    margin-bottom: 6px;
+  }
+
+  p {
+    max-width: 280px;
+    font-size: 0.9rem;
+    margin: 0;
+  }
+}

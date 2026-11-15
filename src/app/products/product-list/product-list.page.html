@@ -1,0 +1,486 @@
+<ion-header [translucent]="true">
+  <ion-toolbar color="primary">
+    <ion-title>
+      <div class="brand-title">
+        <ion-icon name="basket-outline" class="brand-icon"></ion-icon>
+        <span>PantryPal</span>
+        <span
+          class="ws-status-badge"
+          [class.connected]="wsConnected$ | async"
+          [title]="(wsConnected$ | async) ? 'Live Sync Active (WebSocket Connected)' : 'Connecting to Live Sync...'"
+        >
+          {{ (wsConnected$ | async) ? 'LIVE' : 'OFFLINE' }}
+        </span>
+        @if (networkStatus$ | async; as networkStatus) {
+        <ion-badge
+          [color]="networkStatus.connected ? 'success' : 'danger'"
+          [attr.aria-label]="networkStatus.connected ? 'Network online' : 'Network offline'"
+          [title]="networkStatus.connected ? 'Device reports online; API reachability is checked per request' : 'Device reports offline'"
+          class="network-status-badge"
+        >
+          {{ networkStatus.connected ? 'ONLINE' : 'OFFLINE' }}
+        </ion-badge>
+        }
+      </div>
+    </ion-title>
+    <ion-buttons slot="end">
+      <ion-button (click)="openCreateEditor()" fill="clear" aria-label="Add pantry item" title="Add pantry item">
+        <ion-icon name="add-outline" slot="icon-only"></ion-icon>
+      </ion-button>
+      <!-- One-tap button to trigger a test WebSocket notification -->
+      <ion-button
+        (click)="sendTestNotification()"
+        fill="clear"
+        title="Broadcast Test Notification via WebSockets"
+        aria-label="Broadcast Test Notification"
+      >
+        <ion-icon name="sparkles-outline" slot="icon-only"></ion-icon>
+      </ion-button>
+
+      <ion-button (click)="refresh()" fill="clear" aria-label="Refresh inventory">
+        <ion-icon name="refresh-outline" slot="icon-only"></ion-icon>
+      </ion-button>
+
+      <ion-button (click)="logout()" fill="clear" aria-label="Log out" title="Log out">
+        <ion-icon name="log-out-outline" slot="icon-only"></ion-icon>
+      </ion-button>
+    </ion-buttons>
+  </ion-toolbar>
+
+  @if (syncStatus$ | async; as syncStatus) {
+  <ion-toolbar class="sync-status-toolbar">
+    <ion-badge
+      [color]="syncStatus.state === 'attention' ? 'danger' : syncStatus.state === 'synced' ? 'success' : 'warning'"
+      role="status"
+    >
+      @if (syncStatus.state === 'syncing') { <ion-spinner name="dots"></ion-spinner> } {{ syncStatus.message }}
+    </ion-badge>
+    <ion-button
+      slot="end"
+      size="small"
+      fill="outline"
+      [disabled]="syncStatus.pendingCount === 0 || syncStatus.state === 'syncing'"
+      (click)="syncNow()"
+      aria-label="Sync pending pantry changes now"
+    >
+      Sync now
+    </ion-button>
+  </ion-toolbar>
+  }
+
+  <ion-toolbar class="search-toolbar">
+    <ion-searchbar
+      [(ngModel)]="searchQuery"
+      placeholder="Search pantry items..."
+      debounce="200"
+      (ionInput)="searchChanged($event)"
+      show-clear-button="focus"
+    ></ion-searchbar>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content [fullscreen]="true">
+  @if (storageError$ | async; as storageError) {
+  <div class="storage-warning" role="status">{{ storageError }}</div>
+  } @if (actionMessage) {
+  <div
+    class="action-message"
+    [class.warning]="actionMessageColor === 'warning'"
+    [class.error]="actionMessageColor === 'danger'"
+    role="status"
+  >
+    {{ actionMessage }}
+  </div>
+  } @if (cachedOnly$ | async) {
+  <div class="action-message warning" role="status">
+    Showing cached pantry results only. Server paging is unavailable.
+  </div>
+  } @if (pendingChanges$ | async; as pendingChanges) { @if (pendingChanges.length) {
+  <section class="pending-sync-banner" aria-label="Pending pantry changes">
+    <div class="pending-summary">
+      <strong
+        >{{ pendingChanges.length }} change{{ pendingChanges.length === 1 ? '' : 's' }} not sent to the server</strong
+      >
+      <span>These changes are saved on this device and still need to be retried.</span>
+    </div>
+    @for (change of pendingChanges; track change.id) {
+    <div class="pending-change-row">
+      <span>
+        {{ change.product?.name || 'Pantry item' }} — {{ change.type === 'create' ? 'new item' : change.type ===
+        'update' ? 'edited' : 'deletion' }} pending @if (change.lastError) { <small>{{ change.lastError }}</small> }
+      </span>
+      <ion-button size="small" fill="outline" (click)="retryPendingChange(change)">
+        <ion-icon name="cloud-upload-outline" slot="start"></ion-icon>Retry
+      </ion-button>
+    </div>
+    }
+  </section>
+  } }
+
+  <section class="ion-padding product-filters" aria-label="Search and filter pantry products">
+    <ion-select
+      label="Category"
+      labelPlacement="stacked"
+      aria-label="Filter pantry products by category"
+      [(ngModel)]="categoryFilter"
+      (ionChange)="filterChanged()"
+      interface="popover"
+    >
+      <ion-select-option value="">All categories</ion-select-option>
+      @for (category of categories; track category) {
+      <ion-select-option [value]="category">{{ category }}</ion-select-option>
+      }
+    </ion-select>
+    <ion-select
+      label="Expiry"
+      labelPlacement="stacked"
+      [(ngModel)]="expiryFilter"
+      (ionChange)="filterChanged()"
+      interface="popover"
+    >
+      <ion-select-option value="">Any expiry</ion-select-option>
+      <ion-select-option value="expired">Expired</ion-select-option>
+      <ion-select-option value="expiring">Expires within 3 days</ion-select-option>
+      <ion-select-option value="fresh">Fresh</ion-select-option>
+    </ion-select>
+    <ion-select
+      label="Package"
+      labelPlacement="stacked"
+      [(ngModel)]="openedFilter"
+      (ionChange)="filterChanged()"
+      interface="popover"
+    >
+      <ion-select-option value="">Opened or sealed</ion-select-option>
+      <ion-select-option value="opened">Opened</ion-select-option>
+      <ion-select-option value="sealed">Sealed</ion-select-option>
+    </ion-select>
+    <ion-select
+      label="Sort by"
+      labelPlacement="stacked"
+      [(ngModel)]="sortBy"
+      (ionChange)="filterChanged()"
+      interface="popover"
+    >
+      <ion-select-option value="id">Default order</ion-select-option>
+      <ion-select-option value="name">Name</ion-select-option>
+      <ion-select-option value="expirationDate">Expiry date</ion-select-option>
+    </ion-select>
+    @if (sortBy !== 'id') {
+    <ion-select
+      label="Sort direction"
+      labelPlacement="stacked"
+      [(ngModel)]="sortOrder"
+      (ionChange)="filterChanged()"
+      interface="popover"
+    >
+      <ion-select-option value="asc">Ascending</ion-select-option>
+      <ion-select-option value="desc">Descending</ion-select-option>
+    </ion-select>
+    }
+    <ion-button fill="outline" size="small" [disabled]="!hasActiveFilters" (click)="clearFilters()"
+      >Clear search and filters</ion-button
+    >
+  </section>
+
+  <!-- Pull to Refresh -->
+  <ion-refresher slot="fixed" (ionRefresh)="handleRefresh($event)">
+    <ion-refresher-content pullingText="Pull to refresh inventory..." refreshingSpinner="circles">
+    </ion-refresher-content>
+  </ion-refresher>
+
+  <div class="master-detail-container" [class.is-desktop]="isDesktop">
+    <!-- Left Pane: Master Product List -->
+    <div class="master-pane">
+      @if (loading$ | async) {
+      <!-- 1. LOADING STATE -->
+      <div class="state-wrapper">
+        <div class="loading-indicator">
+          <ion-spinner name="crescent" color="primary"></ion-spinner>
+          <span>Fetching pantry inventory from server...</span>
+        </div>
+
+        <ion-list lines="inset" class="skeleton-list">
+          @for (i of skeletonItems; track i) {
+          <ion-item>
+            <ion-skeleton-text
+              [animated]="true"
+              style="width: 38px; height: 38px; border-radius: 8px; margin-right: 12px"
+            ></ion-skeleton-text>
+            <ion-label>
+              <h3><ion-skeleton-text [animated]="true" style="width: 60%"></ion-skeleton-text></h3>
+              <p><ion-skeleton-text [animated]="true" style="width: 40%"></ion-skeleton-text></p>
+            </ion-label>
+            <ion-skeleton-text
+              [animated]="true"
+              slot="end"
+              style="width: 50px; height: 20px; border-radius: 10px"
+            ></ion-skeleton-text>
+          </ion-item>
+          }
+        </ion-list>
+      </div>
+      } @else if (error$ | async; as errorMessage) {
+      <!-- 2. ERROR STATE (NO FALLBACK) -->
+      <div class="state-wrapper error-card">
+        <div class="error-illustration">
+          <ion-icon name="alert-circle-outline" color="danger"></ion-icon>
+        </div>
+        <h3>API Connection Error</h3>
+        <p class="error-text">{{ errorMessage }}</p>
+        <div class="error-actions">
+          <ion-button (click)="retry()" color="primary" fill="solid" size="small">
+            <ion-icon name="refresh-outline" slot="start"></ion-icon>
+            Retry Connection
+          </ion-button>
+        </div>
+      </div>
+      } @else if (filteredProducts.length === 0) {
+      <!-- 3. EMPTY STATE -->
+      <div class="state-wrapper empty-card">
+        <div class="empty-illustration">
+          <ion-icon name="basket-outline" color="medium"></ion-icon>
+        </div>
+        <h3>{{ hasActiveFilters ? 'No Matching Items' : 'Your Pantry is Empty' }}</h3>
+        <p class="empty-text">
+          {{ hasActiveFilters ? 'No pantry products match the current search and filters. Try changing or clearing
+          them.' : 'No food items are currently stored in your pantry inventory.' }}
+        </p>
+        @if (hasActiveFilters) {
+        <ion-button (click)="clearFilters()" fill="outline" size="small">Clear search and filters</ion-button>
+        } @else {
+        <ion-button (click)="refresh()" fill="outline" size="small">
+          <ion-icon name="refresh-outline" slot="start"></ion-icon>
+          Refresh
+        </ion-button>
+        }
+      </div>
+      } @else {
+      <!-- 4. PRODUCT LIST (MASTER) -->
+      <div>
+        <div class="list-summary">
+          <span>{{ filteredProducts.length }} {{ filteredProducts.length === 1 ? 'item' : 'items' }} found</span>
+        </div>
+
+        <ion-list lines="inset" class="product-list">
+          @for (product of filteredProducts; track product.id) {
+          <ion-item
+            button="true"
+            (click)="onSelectProduct(product)"
+            [class.selected-item]="isDesktop && (selectedProduct$ | async)?.id === product.id"
+            class="product-item"
+          >
+            <!-- Category Icon Badge -->
+            @if (product.photoPreviewUrl) {
+            <img
+              slot="start"
+              class="product-photo-thumbnail"
+              [src]="product.photoPreviewUrl"
+              alt="{{ product.name }}"
+              (error)="handlePhotoLoadError(product)"
+            />
+            } @else {
+            <div slot="start" class="category-icon-wrapper">
+              <ion-icon [name]="getCategoryIcon(product.category)"></ion-icon>
+            </div>
+            }
+
+            <!-- Item Main Information -->
+            <ion-label class="product-label">
+              <div class="product-header-line">
+                <h2 class="product-name">{{ product.name }}</h2>
+                <span
+                  class="opened-dot"
+                  [class.opened]="product.isOpened"
+                  [title]="product.isOpened ? 'Opened' : 'Sealed'"
+                ></span>
+              </div>
+              <p class="product-subtext">
+                <span class="product-qty">{{ product.quantity }} {{ product.unit || 'units' }}</span>
+                <span class="bullet-separator">•</span>
+                <span class="product-cat">{{ product.category }}</span>
+              </p>
+              @if (isProductPending(product.id)) {
+              <ion-badge color="warning" class="pending-item-badge">Pending sync</ion-badge>
+              }
+            </ion-label>
+
+            <!-- Expiration Badge & Chevron -->
+            <div slot="end" class="item-end-wrapper">
+              @switch (getExpirationInfo(product.expirationDate).state) { @case ('expired') {
+              <ion-badge color="danger" class="expiration-pill">Expired</ion-badge>
+              } @case ('warning') {
+              <ion-badge color="warning" class="expiration-pill">Soon</ion-badge>
+              } @case ('fresh') {
+              <ion-badge color="success" class="expiration-pill">Fresh</ion-badge>
+              } }
+
+              <ion-icon name="chevron-forward-outline" class="item-chevron" color="medium"></ion-icon>
+              <ion-button
+                fill="clear"
+                size="small"
+                aria-label="Edit {{ product.name }}"
+                title="Edit product"
+                (click)="$event.stopPropagation(); openEditEditor(product)"
+              >
+                <ion-icon name="create-outline" slot="icon-only"></ion-icon>
+              </ion-button>
+              <ion-button
+                fill="clear"
+                size="small"
+                color="danger"
+                aria-label="Delete {{ product.name }}"
+                title="Delete product"
+                (click)="$event.stopPropagation(); confirmDelete(product)"
+              >
+                <ion-icon name="trash-outline" slot="icon-only"></ion-icon>
+              </ion-button>
+              @if (isProductPending(product.id)) {
+              <ion-button
+                fill="clear"
+                size="small"
+                aria-label="Retry sync for {{ product.name }}"
+                (click)="$event.stopPropagation(); retryProductSync(product.id)"
+              >
+                <ion-icon name="cloud-upload-outline" slot="icon-only"></ion-icon>
+              </ion-button>
+              }
+            </div>
+          </ion-item>
+          }
+        </ion-list>
+      </div>
+      }
+    </div>
+
+    <!-- Right Pane: Detail View (Desktop / Tablet Split Layout) -->
+    @if (isDesktop) {
+    <div class="detail-pane">
+      <app-product-detail-view [product]="selectedProduct$ | async"></app-product-detail-view>
+    </div>
+    }
+  </div>
+
+  @if (pageError$ | async; as pageError) {
+  <div class="action-message error" role="alert">
+    <span>{{ pageError }}</span>
+    <ion-button size="small" fill="outline" (click)="retryNextPage()">Retry loading more</ion-button>
+  </div>
+  }
+
+  <ion-infinite-scroll
+    threshold="140px"
+    [disabled]="(hasMore$ | async) === false || (pageLoading$ | async) === true"
+    (ionInfinite)="loadMore($event)"
+  >
+    <ion-infinite-scroll-content loadingSpinner="bubbles" loadingText="Loading more pantry items...">
+    </ion-infinite-scroll-content>
+  </ion-infinite-scroll>
+
+  <ion-modal [isOpen]="isEditorOpen" (didDismiss)="handleEditorDismiss()" aria-label="Pantry product editor">
+    <ng-template>
+      <ion-header>
+        <ion-toolbar color="primary">
+          <ion-title>{{ editingProduct ? 'Edit product' : 'Add product' }}</ion-title>
+          <ion-buttons slot="end">
+            <ion-button (click)="isEditorOpen = false" [disabled]="isSavingProduct">Close</ion-button>
+          </ion-buttons>
+        </ion-toolbar>
+      </ion-header>
+      <ion-content class="ion-padding">
+        <form class="product-editor-form" (ngSubmit)="saveProduct()">
+          <ion-input
+            label="Name"
+            labelPlacement="stacked"
+            name="name"
+            [(ngModel)]="productDraft.name"
+            required
+            maxlength="100"
+          ></ion-input>
+          <ion-input
+            label="Category"
+            labelPlacement="stacked"
+            name="category"
+            [(ngModel)]="productDraft.category"
+            required
+            maxlength="80"
+          ></ion-input>
+          <div class="editor-two-columns">
+            <ion-input
+              label="Quantity"
+              labelPlacement="stacked"
+              name="quantity"
+              type="number"
+              min="0"
+              [(ngModel)]="productDraft.quantity"
+              required
+            ></ion-input>
+            <ion-input label="Unit" labelPlacement="stacked" name="unit" [(ngModel)]="productDraft.unit"></ion-input>
+          </div>
+          <ion-input
+            label="Expiration date"
+            labelPlacement="stacked"
+            name="expirationDate"
+            type="date"
+            [(ngModel)]="productDraft.expirationDate"
+            required
+          ></ion-input>
+          <ion-select
+            label="Packaging"
+            labelPlacement="stacked"
+            name="isOpened"
+            [(ngModel)]="productDraft.isOpened"
+            interface="popover"
+          >
+            <ion-select-option [value]="false">Sealed</ion-select-option>
+            <ion-select-option [value]="true">Opened</ion-select-option>
+          </ion-select>
+          <ion-textarea
+            label="Notes"
+            labelPlacement="stacked"
+            name="notes"
+            [(ngModel)]="productDraft.notes"
+            autoGrow="true"
+            maxlength="500"
+          ></ion-textarea>
+          <section class="photo-editor" aria-label="Product photo">
+            <h3>Product photo</h3>
+            <div class="photo-actions">
+              <ion-button type="button" fill="outline" (click)="takePhoto()" [disabled]="isCapturingPhoto">
+                @if (isCapturingPhoto) { <ion-spinner name="crescent" slot="start"></ion-spinner> } @else {
+                <ion-icon name="camera-outline" slot="start"></ion-icon>
+                } {{ productDraft.photoPreviewUrl ? 'Retake photo' : 'Take photo' }}
+              </ion-button>
+              @if (productDraft.photoPreviewUrl) {
+              <ion-button
+                type="button"
+                fill="clear"
+                color="medium"
+                (click)="removePhoto()"
+                [disabled]="isCapturingPhoto"
+              >
+                Remove photo
+              </ion-button>
+              }
+            </div>
+            @if (productDraft.photoPreviewUrl) {
+            <img
+              class="photo-preview"
+              [src]="productDraft.photoPreviewUrl"
+              alt="Preview of the product photo"
+              (error)="handlePhotoLoadError()"
+              style="display: block; width: 100%; max-height: 280px; object-fit: contain"
+            />
+            <p class="photo-note">Saved on this device. Photo upload is not enabled yet.</p>
+            } @if (cameraMessage) {
+            <p class="camera-message" role="status">{{ cameraMessage }}</p>
+            }
+          </section>
+          <ion-button expand="block" type="submit" [disabled]="isSavingProduct">
+            @if (isSavingProduct) { <ion-spinner name="crescent"></ion-spinner> } @else { {{ editingProduct ? 'Save
+            changes' : 'Add to pantry' }} }
+          </ion-button>
+        </form>
+      </ion-content>
+    </ng-template>
+  </ion-modal>
+</ion-content>

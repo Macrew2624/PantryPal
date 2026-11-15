@@ -1,0 +1,50 @@
+<ion-header [translucent]="true">
+  <ion-toolbar color="primary">
+    <ion-buttons slot="start">
+      <ion-back-button defaultHref="/products" text="Pantry"></ion-back-button>
+    </ion-buttons>
+    <ion-title>{{ product ? product.name : 'Food Details' }}</ion-title>
+    <ion-buttons slot="end">
+      @if (networkStatus$ | async; as networkStatus) {
+      <ion-badge
+        [color]="networkStatus.connected ? 'success' : 'danger'"
+        [attr.aria-label]="networkStatus.connected ? 'Network online' : 'Network offline'"
+        class="network-status-badge"
+      >
+        {{ networkStatus.connected ? 'ONLINE' : 'OFFLINE' }}
+      </ion-badge>
+      }
+      <ion-button (click)="logout()" fill="clear" aria-label="Log out" title="Log out">Log out</ion-button>
+    </ion-buttons>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content [fullscreen]="true" class="ion-padding">
+  @if (isLoading) {
+  <!-- Loading state -->
+  <div class="state-container loading-container">
+    <ion-spinner name="crescent" color="primary"></ion-spinner>
+    <p>Loading item details from server...</p>
+  </div>
+  } @else if (notFound) {
+  <!-- Error / Not found state -->
+  <div class="state-container error-container">
+    <ion-icon name="alert-circle-outline" color="danger" class="state-icon"></ion-icon>
+    <h2>Item Not Found</h2>
+    <p>{{ errorMessage }}</p>
+    <div class="action-buttons">
+      <ion-button (click)="retry()" fill="outline" color="primary">
+        <ion-icon name="refresh-outline" slot="start"></ion-icon>
+        Try Again
+      </ion-button>
+      <ion-button routerLink="/products" fill="solid" color="primary">
+        <ion-icon name="arrow-back-outline" slot="start"></ion-icon>
+        Back to Pantry
+      </ion-button>
+    </div>
+  </div>
+  } @else if (product) {
+  <!-- Product Details -->
+  <app-product-detail-view [product]="product"></app-product-detail-view>
+  }
+</ion-content>
